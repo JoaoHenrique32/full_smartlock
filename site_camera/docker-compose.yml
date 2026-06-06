@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  web:
+    build: .
+    container_name: smartlock_django
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/app
+      # Linha mágica: Salva os modelos de IA na sua máquina para não precisar baixar de novo
+      - ~/.deepface:/root/.deepface  
+    ports:
+      - "8000:8000"
+    depends_on:
+      - mqtt_broker
+
+  mqtt_broker:
+    image: eclipse-mosquitto:latest
+    container_name: smartlock_mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log

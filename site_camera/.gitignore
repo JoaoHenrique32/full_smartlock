@@ -1,0 +1,28 @@
+# Arquivos de Cache do Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Banco de Dados Padrão do Django
+db.sqlite3
+
+# Arquivos de Mídia (As fotos capturadas!)
+banco_rostos/
+*.jpg
+*.jpeg
+*.png
+
+# Configurações do VS Code
+.vscode/
+
+# Ambientes Virtuais (caso você utilize algum)
+venv/
+env/
+
+# Variáveis de Ambiente (Senhas e Chaves Secretas)
+.env
+.env.local
+
+# Arquivos de sistema do Mac/Windows
+.DS_Store
+Thumbs.db

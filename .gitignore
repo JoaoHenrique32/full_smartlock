@@ -1,0 +1,14 @@
+# Python / Django
+__pycache__/
+*.pyc
+site_camera/db.sqlite3
+site_camera/banco_rostos/
+site_camera/rostos_cadastrados/
+
+# PlatformIO / C++
+Fechadura_NodeMCU/.pio/
+Fechadura_NodeMCU/.vscode/
+
+# Pastas de ambiente virtual
+venv/
+env/

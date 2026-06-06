@@ -1,0 +1,123 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>SmartLock - Painel de Controle</title>
+    <style>
+        :root {
+            --bg-dark: #0f172a;
+            --bg-card: #1e293b;
+            --primary-blue: #3b82f6;
+            --text-light: #f8fafc;
+        }
+        body { background: var(--bg-dark); color: var(--text-light); font-family: sans-serif; padding: 20px; }
+        .container { max-width: 1100px; margin: 0 auto; display: grid; grid-template-columns: 1fr 350px; gap: 20px; }
+        .card { background: var(--bg-card); padding: 20px; border-radius: 12px; border: 1px solid #334155; }
+        video { width: 100%; border-radius: 8px; background: #000; }
+        .btn-group { display: flex; gap: 10px; margin-top: 15px; justify-content: center; }
+        .btn { padding: 12px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-green { background: #10b981; }
+        .btn-blue { background: var(--primary-blue); }
+        
+        /* Estilo da Lista de Usuários */
+        .user-list { margin-top: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .user-item { 
+            display: flex; justify-content: space-between; align-items: center; 
+            background: #0f172a; padding: 10px 15px; border-radius: 6px; border: 1px solid #334155;
+        }
+        .btn-delete { background: none; border: none; color: #ef4444; cursor: pointer; font-size: 18px; }
+    </style>
+</head>
+<body>
+
+    <h1 style="text-align: center; margin-bottom: 30px;">🔐 Sistema SmartLock - Gestão Local</h1>
+
+    <div class="container">
+        <div class="card">
+            <h3>Terminal de Acesso</h3>
+            <video id="webcam" autoplay playsinline></video>
+            <div class="btn-group">
+                <button id="btn-identificar" class="btn btn-green">Desbloquear Porta</button>
+                <button id="btn-cadastrar" class="btn btn-blue">Cadastrar Novo Rosto</button>
+            </div>
+        </div>
+
+        <div class="card">
+            <h3>Usuários Autorizados</h3>
+            <div class="user-list">
+                {% if usuarios %}
+                    {% for usuario in usuarios %}
+                    <div class="user-item">
+                        <span>{{ usuario }}</span>
+                        <button class="btn-delete" onclick="deletarUsuario('{{ usuario }}')" title="Remover acesso">🗑️</button>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <p style="color: #64748b; font-size: 14px;">Nenhum rosto cadastrado.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const video = document.getElementById('webcam');
+        const canvas = document.createElement('canvas');
+        const context = canvas.getContext('2d');
+
+        // Inicia Câmera
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => video.srcObject = stream);
+
+        // Função Identificar
+        document.getElementById('btn-identificar').onclick = async () => {
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            const response = await fetch('/identify/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, // <-- Adicionado para estabilidade
+                body: JSON.stringify({ image: canvas.toDataURL('image/jpeg') })
+            });
+            const data = await response.json();
+            
+            // Se 'data.mensagem' não existir, ele mostra o 'data.status' ou um aviso genérico
+            alert(data.mensagem || `Operação finalizada com status: ${data.status}`);
+        };
+
+        // Função Cadastrar
+        document.getElementById('btn-cadastrar').onclick = async () => {
+            const nome = prompt("Nome do novo usuário:");
+            if (!nome) return;
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            context.drawImage(video, 0, 0);
+            const response = await fetch('/register/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }, // <-- Adicionado para estabilidade
+                body: JSON.stringify({ image: canvas.toDataURL('image/jpeg'), nome: nome })
+            });
+            const data = await response.json();
+            
+            if(data.status === 'sucesso') {
+                alert(data.mensagem || "Usuário cadastrado com sucesso!");
+                window.location.reload();
+            } else {
+                alert("Erro: " + (data.mensagem || "Falha no cadastro."));
+            }
+        };
+
+        // FUNÇÃO DELETAR
+        async function deletarUsuario(nome) {
+            if (!confirm(`Deseja realmente remover o acesso de ${nome}?`)) return;
+            
+            const response = await fetch('/delete/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nome: nome })
+            });
+            const data = await response.json();
+            alert(data.mensagem);
+            if(data.status === 'sucesso') window.location.reload();
+        }
+    </script>
+</body>
+</html>
