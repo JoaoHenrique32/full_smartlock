@@ -12,3 +12,5 @@ Fechadura_NodeMCU/.vscode/
 # Pastas de ambiente virtual
 venv/
 env/
+# Ignorar chaves e certificados gerados em laboratório
+phase-1-mocking/docker/emqx/certs/
