@@ -1,0 +1,14 @@
+services:
+  emqx:
+    image: emqx:5
+    container_name: emqx_lab_tls
+    ports:
+      - "1883:1883"   # Porta MQTT padrão (sem criptografia)
+      - "8883:8883"   # Porta MQTT Segura (TLS/SSL - A estrela do show!)
+      - "8083:8083"   # Porta WebSocket (A porta que faltava!)
+      - "18083:18083" # Painel Visual do EMQX no navegador
+    volumes:
+      # Aqui nós dizemos para o Docker plugar a sua pasta do Windows dentro do Linux do EMQX
+      - ./certs/cert.pem:/opt/emqx/etc/certs/cert.pem:ro
+      - ./certs/server.key:/opt/emqx/etc/certs/key.pem:ro
+      - ./certs/cacert.pem:/opt/emqx/etc/certs/cacert.pem:ro

@@ -16,7 +16,7 @@ from deepface import DeepFace
 # ... (mantenha os imports e as funções de API identify_face e register_face que já fizemos)
 
 # --- CONFIGURAÇÃO MQTT ---
-MQTT_BROKER = "mqtt_broker"
+MQTT_BROKER = "host.docker.internal"
 MQTT_TOPIC = "t/fechadura"
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 try:
