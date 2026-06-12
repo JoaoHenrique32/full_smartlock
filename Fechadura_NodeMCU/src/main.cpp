@@ -10,7 +10,7 @@ const char* ssid = SECRET_SSID;         // ◄ Puxa do secrets.h
 const char* password = SECRET_PASS;     // ◄ Puxa do secrets.h
 
 // 2. --- CONFIGURAÇÕES DO MQTT (EMQX) ---
-const char* mqtt_server = "192.168.1.4"; // IP da sua máquina
+const char* mqtt_server = ""; // IP da sua máquina
 const int mqtt_port = 8883;              // Porta TLS Segura
 
 // 3. --- PINOS DE HARDWARE (LEDS) ---
@@ -97,6 +97,13 @@ void setup() {
   Serial.println();
   Serial.print("Conectando-se à rede: ");
   Serial.println(ssid);
+  // --- FORÇANDO O IP FIXO PARA DRIBLAR O ROTEADOR TIM ---
+  IPAddress local_IP(192, 168, 1, 50); // O IP obrigatório do NodeMCU
+  IPAddress gateway(192, 168, 1, 1);   // A porta do seu roteador
+  IPAddress subnet(255, 255, 255, 0);  // A máscara da rede
+
+  WiFi.config(local_IP, gateway, subnet); // Aplica a configuração
+  // ------------------------------------------------------
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {

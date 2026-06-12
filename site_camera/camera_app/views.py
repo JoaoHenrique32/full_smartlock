@@ -1,3 +1,5 @@
+import ssl
+
 from django.shortcuts import render
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -16,14 +18,25 @@ from deepface import DeepFace
 # ... (mantenha os imports e as funções de API identify_face e register_face que já fizemos)
 
 # --- CONFIGURAÇÃO MQTT ---
-MQTT_BROKER = "host.docker.internal"
+MQTT_BROKER = "127.0.0.1"
+MQTT_PORT = 8883
 MQTT_TOPIC = "t/fechadura"
 client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+
+caminho_certificado = os.path.join(settings.BASE_DIR, '..', 'phase-1-mocking', 'docker', 'emqx', 'certs', 'cacert.pem')
+
 try:
-    client.connect(MQTT_BROKER, 1883, 60)
+    # Ativa a criptografia usando o seu cartório
+    client.tls_set(ca_certs=caminho_certificado, tls_version=ssl.PROTOCOL_TLSv1_2)
+    # Ignora a verificação estrita de domínio (igual ao setInsecure() do C++)
+    client.tls_insecure_set(True) 
+    
+    # Conecta e inicia
+    client.connect(MQTT_BROKER, MQTT_PORT, 60)
     client.loop_start()
+    print("✅ Python conectado ao MQTT Seguro com sucesso!")
 except Exception as e:
-    print("Aviso: MQTT não conectou. Docker está ligado?")
+    print(f"❌ Erro fatal no MQTT do Python: {e}")
     
 def index(request):
     """Renderiza a página principal com a lista de usuários cadastrados"""
