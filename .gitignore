@@ -14,3 +14,5 @@ venv/
 env/
 # Ignorar chaves e certificados gerados em laboratório
 phase-1-mocking/docker/emqx/certs/
+
+Fechadura_NodeMCU/src/secrets.h
