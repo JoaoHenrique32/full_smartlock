@@ -26,7 +26,6 @@ ChA5e2NxPc89mI/HaAFygo6kNR34CbSLWfiei1V5GtPm1jVsg3wKTY12kHeTABfu
 GvhpbtFhAQd3+HIftBmKhOjnAp0ZSliv7R2azAn5oKwKPfGd9peo+1CjY7DgTIFT
 51BpZpSFkA==
 -----END CERTIFICATE-----
-
 )EOF";
 
 #endif
