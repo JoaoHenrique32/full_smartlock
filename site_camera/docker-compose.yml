@@ -9,6 +9,8 @@ services:
       - .:/app
       # Linha mágica: Salva os modelos de IA na sua máquina para não precisar baixar de novo
       - ~/.deepface:/root/.deepface  
+      # ADICIONE ESTA LINHA ABAIXO PARA CRIAR O TÚNEL:
+      - ../phase-1-mocking/docker/emqx/certs:/app/certs_emqx:ro
     ports:
       - "8000:8000"
 

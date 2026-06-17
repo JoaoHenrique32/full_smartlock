@@ -4,32 +4,28 @@
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
 #include "secrets.h"
-
-// 1. --- CONFIGURAÇÕES DE REDE ---
-const char* ssid = SECRET_SSID;         // ◄ Puxa do secrets.h
-const char* password = SECRET_PASS;     // ◄ Puxa do secrets.h
+#include <ArduinoOTA.h>
 
 // 2. --- CONFIGURAÇÕES DO MQTT (EMQX) ---
-const char* mqtt_server = ""; // IP da sua máquina
-const int mqtt_port = 8883;              // Porta TLS Segura
+// CORREÇÃO 1: Usar IPAddress em vez de String/Char para burlar a validação de Hostname
+IPAddress mqtt_server(192, 168, 1, 100); // Substitua pelo IP do seu broker MQTT
+const int mqtt_port = 8883;              
 
 // 3. --- PINOS DE HARDWARE (LEDS) ---
-const int ledVerde = D5;     // Indica Acesso Liberado
-const int ledVermelho = D7;  // Indica Acesso Negado / Porta Travada
-
-// 4. --- O SEU CERTIFICADO DE SEGURANÇA (Cole o texto do cacert.pem aqui) ---
+const int ledVerde = D5;     
+const int ledVermelho = D7;  
 
 // Instanciando os clientes seguros
-X509List cert(SECRET_CACERT);
 WiFiClientSecure espClient;
 PubSubClient client(espClient);
+BearSSL::X509List cert(ca_cert);
+BearSSL::X509List client_crt(client_cert);      // O crachá do NodeMCU
+BearSSL::PrivateKey client_privkey(client_key); // A assinatura do NodeMCU 
 
-// Função que escuta as mensagens do EMQX
 void callback(char* topic, byte* payload, unsigned int length) {
   Serial.print("Mensagem recebida no tópico: ");
   Serial.println(topic);
 
-  // Transformando os bytes em texto legível (JSON)
   StaticJsonDocument<200> doc;
   DeserializationError error = deserializeJson(doc, payload, length);
 
@@ -39,22 +35,20 @@ void callback(char* topic, byte* payload, unsigned int length) {
     return;
   }
 
-  // Lendo o status
   const char* status = doc["status"];
   Serial.print("Status recebido: ");
   Serial.println(status);
 
   if (String(status) == "LIBERADO") {
     Serial.println("Acesso Permitido! Acendendo LED Verde. 🟢");
-    digitalWrite(ledVermelho, LOW);  // Apaga o vermelho
-    digitalWrite(ledVerde, HIGH);    // Acende o verde
-    delay(3000);                     // Mantém "aberto" por 3 segundos
-    digitalWrite(ledVerde, LOW);     // Apaga o verde
-    digitalWrite(ledVermelho, HIGH); // Acende o vermelho novamente
+    digitalWrite(ledVermelho, LOW);  
+    digitalWrite(ledVerde, HIGH);    
+    delay(3000);                     
+    digitalWrite(ledVerde, LOW);     
+    digitalWrite(ledVermelho, HIGH); 
     Serial.println("Fechadura travada novamente. 🔴");
   } else {
     Serial.println("Acesso Negado! Piscando LED Vermelho. ❌");
-    // Pisca o vermelho rapidamente para dar feedback de rejeição
     digitalWrite(ledVermelho, LOW);
     delay(150);
     digitalWrite(ledVermelho, HIGH);
@@ -67,17 +61,24 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void reconectarMQTT() {
   while (!client.connected()) {
-    Serial.print("Tentando conectar ao MQTT Seguro...");
-    String clientId = "ESP8266Client-";
-    clientId += String(random(0xffff), HEX);
+    Serial.print("🔐 Tentando conexão MQTT Segura (TLS)... ");
+    
+    const char* device_id = "device-201";
 
-    if (client.connect(clientId.c_str())) {
-      Serial.println(" Conectado!");
+    if (client.connect(device_id, device_id, "")) {
+      Serial.println(" Conectado com SUCESSO ao EMQX!");
       client.subscribe("t/fechadura");
     } else {
       Serial.print(" Falhou, rc=");
       Serial.print(client.state());
-      Serial.println(" Tentando de novo em 5 segundos...");
+      
+      // CORREÇÃO 2: Exibe o erro real escondido dentro da camada TLS (BearSSL)
+      char error_buf[100];
+      espClient.getLastSSLError(error_buf, sizeof(error_buf));
+      Serial.print(" | Erro TLS Real: ");
+      Serial.println(error_buf);
+      
+      Serial.println("Tentando de novo em 5 segundos...");
       delay(5000);
     }
   }
@@ -89,36 +90,71 @@ void setup() {
   pinMode(ledVerde, OUTPUT);
   pinMode(ledVermelho, OUTPUT);
   
-  // Garante que o sistema inicie no estado "Travado"
   digitalWrite(ledVerde, LOW);
   digitalWrite(ledVermelho, HIGH);
 
-  // Conectando ao Wi-Fi
   Serial.println();
   Serial.print("Conectando-se à rede: ");
   Serial.println(ssid);
-  // --- FORÇANDO O IP FIXO PARA DRIBLAR O ROTEADOR TIM ---
-  IPAddress local_IP(192, 168, 1, 50); // O IP obrigatório do NodeMCU
-  IPAddress gateway(192, 168, 1, 1);   // A porta do seu roteador
-  IPAddress subnet(255, 255, 255, 0);  // A máscara da rede
-
-  WiFi.config(local_IP, gateway, subnet); // Aplica a configuração
-  // ------------------------------------------------------
+   
   WiFi.begin(ssid, password);
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nWiFi conectado. IP: " + WiFi.localIP().toString());
+  Serial.println("\n✅ WiFi conectado. IP: " + WiFi.localIP().toString());
 
-  // Configurando a Segurança (TLS) no modo de laboratório (Insecure)
+  configTime(-3 * 3600, 0, "a.st1.ntp.br", "b.st1.ntp.br");
+  Serial.print("⏱️ Sincronizando relógio via NTP para validação TLS...");
+  time_t now = time(nullptr);
+  while (now < 100000) {
+    delay(500);
+    Serial.print(".");
+    now = time(nullptr);
+  }
+  Serial.println("\n✅ Relógio sincronizado com a internet!");
+
+  // CORREÇÃO 3: Otimização de buffers para não estourar a memória RAM do NodeMCU
+  espClient.setBufferSizes(2048, 512);
+
+  // Alimenta o cliente com o certificado CA do secrets.h
   espClient.setTrustAnchors(&cert);
-  espClient.setInsecure(); 
 
-  // Configurando o MQTT
+  // Diz ao ESP quem é o servidor confiável
+  espClient.setTrustAnchors(&cert);
+
+  // 🔴 ATIVAÇÃO DO mTLS: Entrega o crachá e a chave para o servidor validar!
+  espClient.setClientRSACert(&client_crt, &client_privkey);
+
   client.setServer(mqtt_server, mqtt_port);
   client.setCallback(callback);
+
+  // --- CONFIGURAÇÃO DO ARDUINO OTA ---
+  ArduinoOTA.setPort(8266); // Porta padrão do ESP8266
+  ArduinoOTA.setHostname("device-201"); // Nome do dispositivo que aparecerá na rede
+  ArduinoOTA.setPassword("fechadura123"); // 🔒 Senha de segurança para autorizar o upload sem fios
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("🔄 Início da atualização remota (OTA)...");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\n✅ Atualização concluída com sucesso! A reiniciar...");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("⏳ Progresso: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("🚨 Erro [%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Falha na autenticação (Senha errada)");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Falha ao iniciar gravação");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Falha de ligação");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Falha na receção de dados");
+    else if (error == OTA_END_ERROR) Serial.println("Falha na finalização");
+  });
+
+  ArduinoOTA.begin();
+  Serial.println("📶 Serviço OTA iniciado e pronto na rede local!");
 }
 
 void loop() {
@@ -126,4 +162,7 @@ void loop() {
     reconectarMQTT();
   }
   client.loop();
+
+  // 🔴 Executa o serviço OTA em cada ciclo para escutar atualizações na rede
+  ArduinoOTA.handle();
 }
